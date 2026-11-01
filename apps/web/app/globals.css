@@ -1,0 +1,77 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+/* Shared design tokens: shadcn color variables (light + .dark), brand, status, chart, radius, font.
+   Generated from packages/design-tokens/src/tokens.ts - change colors there, not here. */
+@import "@bhw/design-tokens/web.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Variables shadcn needs that the shared tokens do not define, mapped onto token colors. */
+:root {
+  --sidebar: var(--background-subtle);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--brand-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+}
+
+.dark {
+  --sidebar: var(--card);
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-3xl: 20px;
+  --radius-4xl: 24px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Accessibility: honour the OS "reduce motion" setting for every CSS animation and transition. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Printing (DTR, reports): only the page content, never the portal chrome. */
+@media print {
+  [data-slot="sidebar"],
+  [data-slot="sidebar-gap"],
+  [data-slot="sidebar-container"],
+  [data-slot="sidebar-rail"],
+  [data-slot="sidebar-trigger"] {
+    display: none !important;
+  }
+  [data-slot="sidebar-inset"] {
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    // @bhw/types and @bhw/design-tokens are consumed as TypeScript source and use explicit
+    // ".ts" import specifiers (they also run under `node --experimental-strip-types`).
+    "allowImportingTsExtensions": true,
+    "types": ["jest", "node"],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"],
+  "exclude": ["node_modules", "dist", "dist-check", "babel.config.js", "metro.config.js", "jest.config.js"]
+}

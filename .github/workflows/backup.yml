@@ -1,0 +1,49 @@
+# Nightly encrypted database backup (docs/phase-2-architecture/04-operations-and-security.md §2).
+# Required repository secrets:
+#   SUPABASE_DB_URL      Session pooler connection string of the PRODUCTION project (with password)
+#   BACKUP_AGE_RECIPIENT age public key (age1...) of the barangay; the private key stays offline
+# The encrypted dump is kept as a workflow artifact for 30 days; download the latest copies to the
+# barangay's offline storage monthly (12 monthly copies kept there).
+name: backup
+
+on:
+  schedule:
+    - cron: "0 17 * * *" # 01:00 Manila
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - name: Install age
+        run: sudo apt-get update && sudo apt-get install -y age
+      - name: Dump roles, schema and data
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          supabase db dump --db-url "$SUPABASE_DB_URL" --role-only -f roles.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" --data-only --use-copy -f data.sql
+      - name: Encrypt
+        env:
+          BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+        run: |
+          set -euo pipefail
+          stamp=$(TZ=Asia/Manila date +%Y-%m-%d)
+          tar czf "bhw-backup-$stamp.tar.gz" roles.sql schema.sql data.sql
+          age -r "$BACKUP_AGE_RECIPIENT" -o "bhw-backup-$stamp.tar.gz.age" "bhw-backup-$stamp.tar.gz"
+          rm -f roles.sql schema.sql data.sql "bhw-backup-$stamp.tar.gz"
+          echo "STAMP=$stamp" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bhw-backup-${{ env.STAMP }}
+          path: bhw-backup-*.tar.gz.age
+          retention-days: 30
+          if-no-files-found: error

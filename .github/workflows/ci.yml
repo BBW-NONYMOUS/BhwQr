@@ -1,0 +1,95 @@
+# CI for the BHW QR Attendance System (docs/phase-6-deployment/03-deployment.md §3).
+# No repository secrets are used: the web build gets dummy public values and the database job
+# runs a throwaway local Supabase stack with the demo seed.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TELEMETRY_DISABLED: "1"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  node:
+    name: node
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm version comes from "packageManager": "pnpm@11.1.3" in the root package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint, typecheck, unit tests (all workspaces)
+        run: pnpm turbo run lint typecheck test
+
+      - name: Build web
+        run: pnpm --filter @bhw/web build
+        env:
+          # Public placeholders so `next build` can run without a Supabase project.
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+  deno:
+    name: deno
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: supabase/functions
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Edge Function tests
+        run: deno test --allow-env
+
+      - name: Type-check every Edge Function
+        run: deno check */index.ts
+
+  database:
+    name: database
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+
+      - name: Start Supabase (database services only)
+        run: supabase start -x studio,logflare,vector,imgproxy,edge-runtime
+
+      - name: Apply migrations and seed to an empty database
+        run: supabase db reset
+
+      - name: pgTAP tests
+        run: supabase test db
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup
